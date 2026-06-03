@@ -530,8 +530,7 @@ def load_model():
         gdown.download(
             id=FILE_ID,
             output=ZIP_FILE,
-            quiet=False,
-            fuzzy=True
+            quiet=False
         )
 
         # Verify the downloaded file is actually a zip
