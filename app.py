@@ -502,6 +502,17 @@ EMOTION_COLOR = {
 
 
 # =========================================================
+# SESSION STATE
+# =========================================================
+
+if "history" not in st.session_state:
+    st.session_state.history = []
+
+if "total_analyzed" not in st.session_state:
+    st.session_state.total_analyzed = 0
+
+
+# =========================================================
 # MODEL LOADING
 # =========================================================
 
@@ -512,14 +523,14 @@ FILE_ID   = "18j3RU1sw-2c0Ia6AF3WG3-VdKWw8g_FX"
 
 @st.cache_resource(show_spinner=False)
 def load_model():
+    # Download model if not present — no st.* calls inside cached function
     if not os.path.exists(MODEL_DIR):
-        with st.spinner("⬇️  Downloading model weights from Google Drive..."):
-            url = f"https://drive.google.com/uc?id={FILE_ID}"
-            gdown.download(url, ZIP_FILE, quiet=False)
-        with st.spinner("📦  Extracting model..."):
-            with zipfile.ZipFile(ZIP_FILE, "r") as zip_ref:
-                zip_ref.extractall(".")
-
+        url = f"https://drive.google.com/uc?id={FILE_ID}"
+        gdown.download(url, ZIP_FILE, quiet=False)
+        with zipfile.ZipFile(ZIP_FILE, "r") as zip_ref:
+            zip_ref.extractall(".")
+        if os.path.exists(ZIP_FILE):
+            os.remove(ZIP_FILE)
     tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
     model     = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
     model.eval()
@@ -527,10 +538,12 @@ def load_model():
 
 
 try:
-    tokenizer, model = load_model()
+    with st.spinner("🧠  Loading model, please wait..."):
+        tokenizer, model = load_model()
 except Exception as e:
     st.error(f"❌  Model loading failed: {e}")
     st.stop()
+
 
 
 # =========================================================
@@ -653,6 +666,7 @@ with st.sidebar:
     )
 
     st.markdown("---")
+
 
 # =========================================================
 # HERO SECTION
@@ -870,8 +884,6 @@ if page == "📊  Dashboard":
                 """,
                 unsafe_allow_html=True
             )
-
-# ─── ABOUT PAGE ──────────────────────────────────────────
 elif page == "ℹ️  About":
 
     st.markdown(
