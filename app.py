@@ -523,14 +523,48 @@ FILE_ID   = "18j3RU1sw-2c0Ia6AF3WG3-VdKWw8g_FX"
 
 @st.cache_resource(show_spinner=False)
 def load_model():
-    # Download model if not present — no st.* calls inside cached function
     if not os.path.exists(MODEL_DIR):
-        url = f"https://drive.google.com/uc?id={FILE_ID}"
-        gdown.download(url, ZIP_FILE, quiet=False)
+        # Use fuzzy=True to handle Google Drive's large-file
+        # virus-scan confirmation page — without this, Drive
+        # returns an HTML warning page instead of the zip file.
+        gdown.download(
+            id=FILE_ID,
+            output=ZIP_FILE,
+            quiet=False,
+            fuzzy=True
+        )
+
+        # Verify the downloaded file is actually a zip
+        # (if it's tiny, Drive returned an HTML error page)
+        if not os.path.exists(ZIP_FILE):
+            raise RuntimeError(
+                "Download failed — ZIP file not found after gdown."
+            )
+
+        zip_size = os.path.getsize(ZIP_FILE)
+        if zip_size < 1_000_000:  # less than 1 MB = HTML error page
+            with open(ZIP_FILE, "r", errors="ignore") as f:
+                preview = f.read(300)
+            os.remove(ZIP_FILE)
+            raise RuntimeError(
+                f"Download returned HTML instead of ZIP ({zip_size} bytes). "
+                f"Make sure the Google Drive file is shared as 'Anyone with the link'. "
+                f"Preview: {preview[:200]}"
+            )
+
+        # Extract into MODEL_DIR explicitly since zip has no subfolder
+        os.makedirs(MODEL_DIR, exist_ok=True)
         with zipfile.ZipFile(ZIP_FILE, "r") as zip_ref:
-            zip_ref.extractall(".")
+            zip_ref.extractall(MODEL_DIR)
+
         if os.path.exists(ZIP_FILE):
             os.remove(ZIP_FILE)
+
+        if not os.path.exists(MODEL_DIR):
+            raise RuntimeError(
+                "Extraction failed — emotion_model folder not created."
+            )
+
     tokenizer = AutoTokenizer.from_pretrained(MODEL_DIR)
     model     = AutoModelForSequenceClassification.from_pretrained(MODEL_DIR)
     model.eval()
